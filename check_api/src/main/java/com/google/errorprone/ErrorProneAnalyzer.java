@@ -123,10 +123,12 @@ public class ErrorProneAnalyzer implements TaskListener {
     if (JavaCompiler.instance(context).errorCount() > errorProneErrors) {
       return;
     }
+    long startTime = System.nanoTime();
     TreePath path = JavacTrees.instance(context).getPath(taskEvent.getTypeElement());
     if (path == null) {
       path = new TreePath(taskEvent.getCompilationUnit());
     }
+    System.out.println("  errorProneAnalyzer.finished: after TreePath path: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
     // Assert that the event is unique and scan the current tree.
     verify(seen.add(path.getLeaf()), "Duplicate FLOW event for: %s", taskEvent.getTypeElement());
     Log log = Log.instance(context);
@@ -141,19 +143,25 @@ public class ErrorProneAnalyzer implements TaskListener {
           descriptionListener.onDescribed(d);
         };
     JavaFileObject originalSource = log.useSource(compilation.getSourceFile());
+    System.out.println("  errorProneAnalyzer.finished: after JavaFileObject originalSource: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
     try {
       if (shouldExcludeSourceFile(compilation)) {
         return;
       }
+      System.out.println("  errorProneAnalyzer.finished: after shouldExcludeSourceFile: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
       if (path.getLeaf().getKind() == Tree.Kind.COMPILATION_UNIT) {
         // We only get TaskEvents for compilation units if they contain no package declarations
         // (e.g. package-info.java files).  In this case it's safe to analyze the
         // CompilationUnitTree immediately.
-        transformer.get().apply(path, context, countingDescriptionListener);
+        CodeTransformer codeTransformer = transformer.get();
+        codeTransformer.apply(path, context, countingDescriptionListener);
+        System.out.println("  errorProneAnalyzer.finished: after transformer[of type " + codeTransformer.getClass().getName() + "].get().apply(path...): " + ((System.nanoTime() - startTime) / 1e6) + " ms");
       } else if (finishedCompilation(path.getCompilationUnit())) {
         // Otherwise this TaskEvent is for a ClassTree, and we can scan the whole
         // CompilationUnitTree once we've seen all the enclosed classes.
-        transformer.get().apply(new TreePath(compilation), context, countingDescriptionListener);
+        CodeTransformer codeTransformer = transformer.get();
+        codeTransformer.apply(new TreePath(compilation), context, countingDescriptionListener);
+        System.out.println("  errorProneAnalyzer.finished: after transformer[of type " + codeTransformer.getClass().getName() + "].get().apply(new TreePath...): " + ((System.nanoTime() - startTime) / 1e6) + " ms");
       }
     } catch (ErrorProneError e) {
       e.logFatalError(log, context);
@@ -175,6 +183,7 @@ public class ErrorProneAnalyzer implements TaskListener {
       log.error("proc.cant.access", e.sym, getDetailValue(e), getStackTraceAsString(e));
     } finally {
       log.useSource(originalSource);
+      System.out.println("  errorProneAnalyzer.finished: after log.useSource: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
     }
   }
 
