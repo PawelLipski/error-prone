@@ -62,8 +62,8 @@ public class MoreThanOneInjectableConstructor extends BugChecker implements Anno
       }
       return Description.NO_MATCH;
     } finally {
-      double duration = (System.nanoTime() - startTime) / 1e6;
-      System.out.println("      ===== MoreThanOneInjectableConstructor.matchAnnotation duration: " + duration + " ms =====");
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      MoreThanOneInjectableConstructor.matchAnnotation duration: " + duration + " us");
     }
   }
 }

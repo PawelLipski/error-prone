@@ -153,102 +153,144 @@ public class CompileTimeConstantChecker extends BugChecker
 
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
-    Symbol.MethodSymbol sym = ASTHelpers.getSymbol(tree);
-    return matchArguments(state, sym, tree.getArguments().iterator());
+    long startTime = System.nanoTime();
+    try {
+      Symbol.MethodSymbol sym = ASTHelpers.getSymbol(tree);
+      return matchArguments(state, sym, tree.getArguments().iterator());
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchNewClass duration: " + duration + " us");
+    }
   }
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
-    Symbol.MethodSymbol sym = ASTHelpers.getSymbol(tree);
-    return matchArguments(state, sym, tree.getArguments().iterator());
+    long startTime = System.nanoTime();
+    try {
+      Symbol.MethodSymbol sym = ASTHelpers.getSymbol(tree);
+      return matchArguments(state, sym, tree.getArguments().iterator());
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchMethodInvocation duration: " + duration + " us");
+    }
   }
 
   @Override
   public Description matchMethod(MethodTree node, VisitorState state) {
-    Symbol.MethodSymbol method = ASTHelpers.getSymbol(node);
-    List<Integer> compileTimeConstantAnnotationIndexes =
-        getAnnotatedParams(method.getParameters(), state);
-    if (compileTimeConstantAnnotationIndexes.isEmpty()) {
-      return Description.NO_MATCH;
+    long startTime = System.nanoTime();
+    try {
+      Symbol.MethodSymbol method = ASTHelpers.getSymbol(node);
+      List<Integer> compileTimeConstantAnnotationIndexes =
+          getAnnotatedParams(method.getParameters(), state);
+      if (compileTimeConstantAnnotationIndexes.isEmpty()) {
+        return Description.NO_MATCH;
+      }
+      return checkSuperMethods(
+          node,
+          state,
+          compileTimeConstantAnnotationIndexes,
+          ASTHelpers.findSuperMethods(method, state.getTypes()));
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchMethod duration: " + duration + " us");
     }
-    return checkSuperMethods(
-        node,
-        state,
-        compileTimeConstantAnnotationIndexes,
-        ASTHelpers.findSuperMethods(method, state.getTypes()));
   }
 
   @Override
   public Description matchMemberReference(MemberReferenceTree node, VisitorState state) {
-    Symbol.MethodSymbol sym = ASTHelpers.getSymbol(node);
-    List<Integer> compileTimeConstantAnnotationIndexes =
-        getAnnotatedParams(sym.getParameters(), state);
-    if (compileTimeConstantAnnotationIndexes.isEmpty()) {
-      return Description.NO_MATCH;
+    long startTime = System.nanoTime();
+    try {
+      Symbol.MethodSymbol sym = ASTHelpers.getSymbol(node);
+      List<Integer> compileTimeConstantAnnotationIndexes =
+              getAnnotatedParams(sym.getParameters(), state);
+      if (compileTimeConstantAnnotationIndexes.isEmpty()) {
+        return Description.NO_MATCH;
+      }
+      return checkLambda(node, state, compileTimeConstantAnnotationIndexes);
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchMemberReference duration: " + duration + " us");
     }
-    return checkLambda(node, state, compileTimeConstantAnnotationIndexes);
   }
 
   @Override
   public Description matchLambdaExpression(LambdaExpressionTree node, VisitorState state) {
-    List<Integer> compileTimeConstantAnnotationIndexes =
-        getAnnotatedParams(
-            node.getParameters().stream().map(ASTHelpers::getSymbol).collect(toImmutableList()),
-            state);
-    if (compileTimeConstantAnnotationIndexes.isEmpty()) {
-      return Description.NO_MATCH;
+    long startTime = System.nanoTime();
+    try {
+      List<Integer> compileTimeConstantAnnotationIndexes =
+              getAnnotatedParams(
+                      node.getParameters().stream().map(ASTHelpers::getSymbol).collect(toImmutableList()),
+                      state);
+      if (compileTimeConstantAnnotationIndexes.isEmpty()) {
+        return Description.NO_MATCH;
+      }
+      return checkLambda(node, state, compileTimeConstantAnnotationIndexes);
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchLambdaExpression duration: " + duration + " us");
     }
-    return checkLambda(node, state, compileTimeConstantAnnotationIndexes);
   }
 
   @Override
   public Description matchVariable(VariableTree node, VisitorState state) {
-    Symbol symbol = ASTHelpers.getSymbol(node);
-    if (!hasCompileTimeConstantAnnotation(state, symbol)) {
-      return Description.NO_MATCH;
-    }
-    switch (symbol.getKind()) {
-      case PARAMETER:
+    long startTime = System.nanoTime();
+    try {
+      Symbol symbol = ASTHelpers.getSymbol(node);
+      if (!hasCompileTimeConstantAnnotation(state, symbol)) {
         return Description.NO_MATCH;
-      case FIELD:
-        break; // continue below
-      case LOCAL_VARIABLE: // disallowed by @Target meta-annotation
-      default: // impossible
-        throw new AssertionError(symbol.getKind());
+      }
+      switch (symbol.getKind()) {
+        case PARAMETER:
+          return Description.NO_MATCH;
+        case FIELD:
+          break; // continue below
+        case LOCAL_VARIABLE: // disallowed by @Target meta-annotation
+        default: // impossible
+          throw new AssertionError(symbol.getKind());
+      }
+      if ((symbol.flags() & Flags.FINAL) == 0) {
+        return buildDescription(node)
+                .setMessage(
+                        this.message()
+                                + String.format(DID_YOU_MEAN_FINAL_FMT_MESSAGE, symbol.getSimpleName()))
+                .build();
+      }
+      if (node.getInitializer() != null
+              && !compileTimeConstExpressionMatcher.matches(node.getInitializer(), state)) {
+        return describeMatch(node.getInitializer());
+      }
+      return Description.NO_MATCH;
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.matchVariable duration: " + duration + " us");
     }
-    if ((symbol.flags() & Flags.FINAL) == 0) {
-      return buildDescription(node)
-          .setMessage(
-              this.message()
-                  + String.format(DID_YOU_MEAN_FINAL_FMT_MESSAGE, symbol.getSimpleName()))
-          .build();
-    }
-    if (node.getInitializer() != null
-        && !compileTimeConstExpressionMatcher.matches(node.getInitializer(), state)) {
-      return describeMatch(node.getInitializer());
-    }
-    return Description.NO_MATCH;
   }
 
   @Override
   public Description matchAssignment(AssignmentTree node, VisitorState state) {
-    ExpressionTree variable = node.getVariable();
-    ExpressionTree expression = node.getExpression();
-    Symbol assignedSymbol = ASTHelpers.getSymbol(variable);
-    if (assignedSymbol == null || assignedSymbol.owner == null) {
-      return Description.NO_MATCH;
+    long startTime = System.nanoTime();
+    try {
+      ExpressionTree variable = node.getVariable();
+      ExpressionTree expression = node.getExpression();
+      Symbol assignedSymbol = ASTHelpers.getSymbol(variable);
+      if (assignedSymbol == null || assignedSymbol.owner == null) {
+        return Description.NO_MATCH;
+      }
+      if (assignedSymbol.owner.getKind() != ElementKind.CLASS
+              && assignedSymbol.owner.getKind() != ElementKind.ENUM) {
+        return Description.NO_MATCH;
+      }
+      if (!hasCompileTimeConstantAnnotation(state, assignedSymbol)) {
+        return Description.NO_MATCH;
+      }
+      if (compileTimeConstExpressionMatcher.matches(expression, state)) {
+        return Description.NO_MATCH;
+      }
+      return describeMatch(expression);
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      CompileTimeConstant.startTime duration: " + duration + " us");
     }
-    if (assignedSymbol.owner.getKind() != ElementKind.CLASS
-        && assignedSymbol.owner.getKind() != ElementKind.ENUM) {
-      return Description.NO_MATCH;
-    }
-    if (!hasCompileTimeConstantAnnotation(state, assignedSymbol)) {
-      return Description.NO_MATCH;
-    }
-    if (compileTimeConstExpressionMatcher.matches(expression, state)) {
-      return Description.NO_MATCH;
-    }
-    return describeMatch(expression);
   }
 
   private Description checkLambda(

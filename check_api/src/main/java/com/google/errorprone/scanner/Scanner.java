@@ -55,10 +55,10 @@ public class Scanner extends TreePathScanner<Void, VisitorState> {
   public Void scan(TreePath path, VisitorState state) {
     long startTime = System.nanoTime();
     SuppressionInfo prevSuppressionInfo = updateSuppressions(path.getLeaf(), state);
-    System.out.println("      Scanner.scan: after updateSuppressions: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
+    //System.out.println("      Scanner.scan: after updateSuppressions: " + ((System.nanoTime() - startTime) / 1000) + " us");
     try {
       Void result = super.scan(path, state);
-      System.out.println("      Scanner.scan: after super.scan: " + ((System.nanoTime() - startTime) / 1e6) + " ms");
+      //System.out.println("      Scanner.scan: after super.scan: " + ((System.nanoTime() - startTime) / 1000) + " us");
       return result;
     } finally {
       // Restore old suppression state.
