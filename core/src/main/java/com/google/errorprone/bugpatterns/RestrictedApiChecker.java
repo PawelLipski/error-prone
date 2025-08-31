@@ -79,17 +79,23 @@ public class RestrictedApiChecker extends BugChecker
    */
   @Override
   public Description matchAnnotation(AnnotationTree tree, VisitorState state) {
-    // TODO(bangert): Validate all the fields
-    if (!getSymbol(tree).getQualifiedName().contentEquals(RestrictedApi.class.getName())) {
+    long startTime = System.nanoTime();
+    try {
+      // TODO(bangert): Validate all the fields
+      if (!getSymbol(tree).getQualifiedName().contentEquals(RestrictedApi.class.getName())) {
+        return NO_MATCH;
+      }
+      // TODO(bangert): make a more elegant API to get the annotation within an annotation tree.
+      // Maybe find the declared object and get annotations on that...
+      Attribute.Compound restrictedApi = (Attribute.Compound) ASTHelpers.getAnnotationMirror(tree);
+      if (restrictedApi == null) {
+        return NO_MATCH;
+      }
       return NO_MATCH;
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      RestrictedApi.matchAnnotation duration: " + duration + " us");
     }
-    // TODO(bangert): make a more elegant API to get the annotation within an annotation tree.
-    // Maybe find the declared object and get annotations on that...
-    Attribute.Compound restrictedApi = (Attribute.Compound) ASTHelpers.getAnnotationMirror(tree);
-    if (restrictedApi == null) {
-      return NO_MATCH;
-    }
-    return NO_MATCH;
   }
 
   private static final ImmutableSet<String> ALLOWLIST_ANNOTATION_NAMES =
@@ -113,12 +119,24 @@ public class RestrictedApiChecker extends BugChecker
 
   @Override
   public Description matchMethodInvocation(MethodInvocationTree tree, VisitorState state) {
-    return checkMethodUse(getSymbol(tree), tree, state);
+    long startTime = System.nanoTime();
+    try {
+      return checkMethodUse(getSymbol(tree), tree, state);
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      RestrictedApi.matchMethodInvocation duration: " + duration + " us");
+    }
   }
 
   @Override
   public Description matchMemberReference(MemberReferenceTree tree, VisitorState state) {
-    return checkMethodUse(getSymbol(tree), tree, state);
+    long startTime = System.nanoTime();
+    try {
+      return checkMethodUse(getSymbol(tree), tree, state);
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      RestrictedApi.matchMemberReference duration: " + duration + " us");
+    }
   }
 
   /**
@@ -169,10 +187,16 @@ public class RestrictedApiChecker extends BugChecker
 
   @Override
   public Description matchNewClass(NewClassTree tree, VisitorState state) {
-    if (tree.getClassBody() != null) {
-      return checkMethodUse(superclassConstructorSymbol(tree, state), tree, state);
-    } else {
-      return checkRestriction(getRestrictedApiAnnotation(getSymbol(tree), state), tree, state);
+    long startTime = System.nanoTime();
+    try {
+      if (tree.getClassBody() != null) {
+        return checkMethodUse(superclassConstructorSymbol(tree, state), tree, state);
+      } else {
+        return checkRestriction(getRestrictedApiAnnotation(getSymbol(tree), state), tree, state);
+      }
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      RestrictedApi.matchNewClass duration: " + duration + " us");
     }
   }
 

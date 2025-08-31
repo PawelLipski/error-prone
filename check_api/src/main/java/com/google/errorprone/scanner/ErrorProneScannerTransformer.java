@@ -40,7 +40,11 @@ public abstract class ErrorProneScannerTransformer implements CodeTransformer {
 
   @Override
   public void apply(TreePath tree, Context context, DescriptionListener listener) {
-    scanner().scan(tree, createVisitorState(context, listener).withPath(tree));
+    long startTime = System.nanoTime();
+    VisitorState state = createVisitorState(context, listener).withPath(tree);
+    //System.out.println("    ErrorProneScannerTransformer.apply: after createVisitorState: " + ((System.nanoTime() - startTime) / 1000) + " us");
+    scanner().scan(tree, state);
+    //System.out.println("    ErrorProneScannerTransformer.apply: after scanner().scan: " + ((System.nanoTime() - startTime) / 1000) + " us");
   }
 
   @Override

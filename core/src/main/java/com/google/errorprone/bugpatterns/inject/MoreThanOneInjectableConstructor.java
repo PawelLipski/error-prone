@@ -52,12 +52,18 @@ public class MoreThanOneInjectableConstructor extends BugChecker implements Anno
 
   @Override
   public Description matchAnnotation(AnnotationTree tree, VisitorState state) {
-    if (IS_EITHER_INJECT.matches(tree, state)) {
-      Tree injectedMember = state.getPath().getParentPath().getParentPath().getLeaf();
-      if (isFirstConstructorOfMultiInjectedClass(getSymbol(injectedMember))) {
-        return describeMatch(ASTHelpers.findEnclosingNode(state.getPath(), ClassTree.class));
+    long startTime = System.nanoTime();
+    try {
+      if (IS_EITHER_INJECT.matches(tree, state)) {
+        Tree injectedMember = state.getPath().getParentPath().getParentPath().getLeaf();
+        if (isFirstConstructorOfMultiInjectedClass(getSymbol(injectedMember))) {
+          return describeMatch(ASTHelpers.findEnclosingNode(state.getPath(), ClassTree.class));
+        }
       }
+      return Description.NO_MATCH;
+    } finally {
+      long duration = (System.nanoTime() - startTime) / 1000;
+      System.out.println("      MoreThanOneInjectableConstructor.matchAnnotation duration: " + duration + " us");
     }
-    return Description.NO_MATCH;
   }
 }
